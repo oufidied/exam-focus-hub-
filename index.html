@@ -1,0 +1,1335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Focus Station" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#08090a" />
+  <title>Exam Focus Station</title>
+ 
+  <style>
+    /* ─── RESET & BASE ──────────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+ 
+    :root {
+      --bg:         #08090a;
+      --glass:      #121417;
+      --border:     rgba(255,255,255,0.06);
+      --text:       #f0f0f2;
+      --muted:      rgba(240,240,242,0.38);
+      --accent:     #00e676;
+      --accent2:    #29b6f6;
+      --danger:     #ff5252;
+      --radius:     18px;
+      --dark-multi: 1;
+    }
+ 
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Courier New', 'Menlo', 'Monaco', monospace;
+      -webkit-text-size-adjust: 100%;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: none;
+      overflow-x: hidden;
+    }
+ 
+    body {
+      min-height: 100dvh;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+      background: radial-gradient(ellipse at 20% 10%, rgba(0,230,118,0.04) 0%, transparent 55%),
+                  radial-gradient(ellipse at 80% 80%, rgba(41,182,246,0.04) 0%, transparent 55%),
+                  var(--bg);
+    }
+ 
+    /* ─── SCROLLBAR ──────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+ 
+    /* ─── GRAIN OVERLAY ──────────────────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+      background-size: 200px 200px;
+      pointer-events: none;
+      z-index: 999;
+      opacity: 0.6;
+    }
+ 
+    /* ─── GLASS CARD ──────────────────────────────────────────────────── */
+    .card {
+      background: rgba(18,20,23,calc(0.85 * var(--dark-multi)));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 60%);
+      pointer-events: none;
+    }
+ 
+    /* ─── LAYOUT ──────────────────────────────────────────────────────── */
+    #app {
+      display: grid;
+      gap: 12px;
+      padding: 12px;
+      max-width: 900px;
+      margin: 0 auto;
+      min-height: 100dvh;
+      align-content: start;
+    }
+ 
+    /* Portrait layout */
+    @media (orientation: portrait) {
+      #app {
+        grid-template-areas:
+          "clock"
+          "timer"
+          "info-row"
+          "vacation";
+        grid-template-columns: 1fr;
+      }
+    }
+ 
+    /* Landscape layout */
+    @media (orientation: landscape) {
+      #app {
+        grid-template-areas:
+          "timer  clock"
+          "timer  info-row"
+          "timer  vacation";
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto auto 1fr;
+        min-height: 100dvh;
+        align-content: stretch;
+      }
+      #timer-card { grid-area: timer; align-self: stretch; }
+    }
+ 
+    /* Grid areas */
+    #clock-card    { grid-area: clock; }
+    #timer-card    { grid-area: timer; }
+    #info-row      { grid-area: info-row; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    #vacation-card { grid-area: vacation; }
+ 
+    /* ─── CLOCK CARD ──────────────────────────────────────────────────── */
+    #clock-card {
+      padding: 20px 24px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .clock-left { display: flex; flex-direction: column; gap: 2px; }
+    #live-time {
+      font-size: clamp(2.4rem, 7vw, 3.2rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 0 28px rgba(41,182,246,0.25);
+      transition: color 0.4s;
+    }
+    #live-date {
+      font-size: 0.72rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .clock-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    #session-count-badge {
+      background: rgba(0,230,118,0.12);
+      border: 1px solid rgba(0,230,118,0.2);
+      border-radius: 40px;
+      padding: 4px 12px;
+      font-size: 0.68rem;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+ 
+    /* ─── TIMER CARD ──────────────────────────────────────────────────── */
+    #timer-card {
+      padding: 28px 24px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      position: relative;
+    }
+    .timer-label {
+      font-size: 0.62rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .timer-label .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+    .timer-label .dot.paused { animation: none; background: var(--muted); }
+ 
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(0,230,118,0.4); }
+      50% { opacity: 0.7; transform: scale(1.2); box-shadow: 0 0 0 6px rgba(0,230,118,0); }
+    }
+ 
+    /* SVG ring progress */
+    .ring-wrap {
+      position: relative;
+      width: clamp(180px, 48vw, 260px);
+      height: clamp(180px, 48vw, 260px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .ring-wrap svg {
+      position: absolute;
+      inset: 0;
+      width: 100%; height: 100%;
+      transform: rotate(-90deg);
+    }
+    .ring-track { fill: none; stroke: rgba(255,255,255,0.05); stroke-width: 3; }
+    #ring-progress {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 3;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.8s cubic-bezier(0.4,0,0.2,1), stroke 0.4s;
+      filter: drop-shadow(0 0 6px var(--accent));
+    }
+    .ring-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0px;
+      z-index: 1;
+    }
+    #timer-display {
+      font-size: clamp(3rem, 12vw, 5.5rem);
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      text-shadow: 0 0 40px rgba(0,230,118,0.2);
+      transition: color 0.3s;
+    }
+    #timer-display.running { color: var(--accent); }
+    #timer-display.paused  { color: var(--muted); }
+    #timer-display.idle    { color: var(--text); }
+    #timer-display.done    { color: var(--danger); animation: flash-done 0.8s ease-in-out infinite alternate; }
+    @keyframes flash-done {
+      from { text-shadow: 0 0 20px rgba(255,82,82,0.3); }
+      to   { text-shadow: 0 0 60px rgba(255,82,82,0.7); }
+    }
+ 
+    #timer-sub {
+      font-size: 0.6rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+ 
+    /* Controls */
+    .timer-controls {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+    }
+    .btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 50px;
+      color: var(--text);
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    .btn:active { transform: scale(0.93); }
+    .btn-primary {
+      width: 60px; height: 60px;
+      border-color: var(--accent);
+      background: rgba(0,230,118,0.08);
+      color: var(--accent);
+      font-size: 1.4rem;
+    }
+    .btn-primary:hover { background: rgba(0,230,118,0.16); box-shadow: 0 0 20px rgba(0,230,118,0.15); }
+    .btn-sm {
+      width: 42px; height: 42px;
+      font-size: 1rem;
+      color: var(--muted);
+    }
+    .btn-sm:hover { border-color: rgba(255,255,255,0.15); color: var(--text); }
+ 
+    /* Duration picker */
+    .duration-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .dur-label {
+      font-size: 0.6rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+      width: 100%;
+      text-align: center;
+    }
+    .dur-chip {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 40px;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+      padding: 5px 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .dur-chip:hover, .dur-chip.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(0,230,118,0.08);
+    }
+    .dur-custom {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      border: 1px solid var(--border);
+      border-radius: 40px;
+      padding: 4px 10px;
+      transition: border-color 0.2s;
+    }
+    .dur-custom:focus-within { border-color: rgba(255,255,255,0.2); }
+    .dur-custom input {
+      background: none;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.7rem;
+      width: 32px;
+      text-align: center;
+    }
+    .dur-custom span { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.08em; }
+ 
+    /* Progress bar under timer */
+    .timer-progress-bar {
+      width: 100%;
+      height: 2px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    #progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 2px;
+      width: 0%;
+      transition: width 0.8s linear;
+      box-shadow: 0 0 8px var(--accent);
+    }
+ 
+    /* ─── WEATHER CARD ──────────────────────────────────────────────────── */
+    .info-card {
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .info-card-label {
+      font-size: 0.58rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    #weather-icon {
+      font-size: 2rem;
+      line-height: 1;
+    }
+    #weather-temp {
+      font-size: 1.9rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      cursor: text;
+      outline: none;
+      border: none;
+      background: none;
+      color: var(--accent2);
+      font-family: inherit;
+      width: 100%;
+      text-shadow: 0 0 20px rgba(41,182,246,0.2);
+    }
+    #weather-cond {
+      font-size: 0.7rem;
+      color: var(--muted);
+      cursor: text;
+      outline: none;
+      border: none;
+      background: none;
+      font-family: inherit;
+      letter-spacing: 0.06em;
+      width: 100%;
+    }
+    [contenteditable]:focus {
+      border-bottom: 1px solid rgba(255,255,255,0.15);
+    }
+ 
+    /* ─── FOCUS MODE CARD ──────────────────────────────────────────────── */
+    #focus-card {
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .focus-mode-label {
+      font-size: 0.58rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .focus-mode-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
+    .focus-mode-sub {
+      font-size: 0.65rem;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+    .mode-chips {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 2px;
+    }
+    .mode-chip {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 40px;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.62rem;
+      letter-spacing: 0.06em;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: all 0.18s;
+    }
+    .mode-chip.active {
+      border-color: var(--accent2);
+      color: var(--accent2);
+      background: rgba(41,182,246,0.08);
+    }
+ 
+    /* ─── VACATION CARD ──────────────────────────────────────────────────── */
+    #vacation-card {
+      padding: 18px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .vac-left { display: flex; flex-direction: column; gap: 4px; }
+    .vac-label {
+      font-size: 0.58rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    #vac-days {
+      font-size: clamp(2.6rem, 9vw, 4rem);
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      color: var(--text);
+      text-shadow: 0 0 30px rgba(0,230,118,0.12);
+    }
+    #vac-days span { color: var(--accent); }
+    .vac-sub { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.06em; }
+    .vac-right { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+    .vac-date-label { font-size: 0.58rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+    #vac-date-input {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.75rem;
+      padding: 7px 12px;
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.2s;
+      color-scheme: dark;
+    }
+    #vac-date-input:focus { border-color: rgba(255,255,255,0.2); }
+ 
+    /* ─── CONFIG PANEL ────────────────────────────────────────────────── */
+    #config-toggle {
+      position: fixed;
+      top: max(14px, env(safe-area-inset-top, 14px));
+      right: 16px;
+      z-index: 100;
+      width: 38px; height: 38px;
+      background: rgba(18,20,23,0.9);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      backdrop-filter: blur(10px);
+      color: var(--muted);
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    #config-toggle:hover { border-color: rgba(255,255,255,0.18); color: var(--text); }
+ 
+    #config-panel {
+      position: fixed;
+      top: 0; right: -320px;
+      width: 300px;
+      height: 100dvh;
+      z-index: 200;
+      background: rgba(12,13,15,0.97);
+      border-left: 1px solid var(--border);
+      backdrop-filter: blur(20px);
+      padding: 56px 22px 32px;
+      overflow-y: auto;
+      transition: right 0.35s cubic-bezier(0.4,0,0.2,1);
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+    #config-panel.open { right: 0; }
+ 
+    .config-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0);
+      z-index: 199;
+      pointer-events: none;
+      transition: background 0.35s;
+    }
+    .config-overlay.open {
+      background: rgba(0,0,0,0.55);
+      pointer-events: all;
+    }
+ 
+    .cfg-section-title {
+      font-size: 0.58rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .cfg-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .cfg-row label {
+      font-size: 0.75rem;
+      color: var(--text);
+      letter-spacing: 0.04em;
+    }
+    .cfg-row input[type="range"] {
+      width: 100px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .cfg-row select {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.72rem;
+      padding: 5px 8px;
+      outline: none;
+      color-scheme: dark;
+      cursor: pointer;
+    }
+    .color-swatches {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .swatch {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: border-color 0.15s, transform 0.15s;
+    }
+    .swatch:hover, .swatch.active { border-color: white; transform: scale(1.15); }
+    .cfg-close {
+      position: absolute;
+      top: 14px; right: 14px;
+      background: none; border: none;
+      color: var(--muted);
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 4px 8px;
+      transition: color 0.2s;
+    }
+    .cfg-close:hover { color: var(--text); }
+    .cfg-divider { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+ 
+    /* Session stats in config */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .stat-cell {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .stat-val { font-size: 1.4rem; font-weight: 700; color: var(--accent); }
+    .stat-lbl { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.08em; margin-top: 2px; }
+ 
+    /* ─── AMBIENT RINGS (decoration) ──────────────────────────────────── */
+    .ambient-ring {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+    }
+ 
+    /* ─── NOTIFICATION TOAST ─────────────────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: max(28px, env(safe-area-inset-bottom, 28px));
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: rgba(18,20,23,0.96);
+      border: 1px solid var(--border);
+      border-radius: 40px;
+      padding: 10px 22px;
+      font-size: 0.72rem;
+      color: var(--text);
+      letter-spacing: 0.06em;
+      z-index: 500;
+      transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.35s;
+      opacity: 0;
+      white-space: nowrap;
+      backdrop-filter: blur(12px);
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+ 
+    /* ─── LANDSCAPE ADJUSTMENTS ──────────────────────────────────────── */
+    @media (orientation: landscape) {
+      #timer-card .ring-wrap {
+        width: clamp(160px, 30vw, 240px);
+        height: clamp(160px, 30vw, 240px);
+      }
+      #timer-display {
+        font-size: clamp(2.5rem, 8vw, 5rem);
+      }
+      #live-time {
+        font-size: clamp(2rem, 5vw, 3rem);
+      }
+    }
+ 
+    @media (max-width: 400px) {
+      #app { padding: 8px; gap: 8px; }
+      .btn-primary { width: 52px; height: 52px; }
+    }
+ 
+    /* ─── ANIMATIONS ────────────────────────────────────────────────── */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .card { animation: fadeIn 0.5s ease both; }
+    #clock-card    { animation-delay: 0.05s; }
+    #timer-card    { animation-delay: 0.12s; }
+    #info-row      { animation-delay: 0.2s; }
+    #vacation-card { animation-delay: 0.28s; }
+ 
+    /* glow pulse on running timer card */
+    #timer-card.running::after {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: var(--radius);
+      border: 1px solid rgba(0,230,118,0.15);
+      animation: glow-border 2s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+    @keyframes glow-border {
+      from { box-shadow: 0 0 0px rgba(0,230,118,0); }
+      to   { box-shadow: 0 0 30px rgba(0,230,118,0.12); }
+    }
+ 
+    /* Subtle scanline on weather icon */
+    @keyframes rotate-icon {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+ 
+<div id="app">
+ 
+  <!-- ── CLOCK CARD ─────────────────────────────────────────── -->
+  <div class="card" id="clock-card">
+    <div class="clock-left">
+      <div id="live-time">00:00:00</div>
+      <div id="live-date">Monday · 01 January 2026</div>
+    </div>
+    <div class="clock-right">
+      <div id="session-count-badge">0 sessions today</div>
+    </div>
+  </div>
+ 
+  <!-- ── TIMER CARD ─────────────────────────────────────────── -->
+  <div class="card" id="timer-card">
+    <div class="timer-label">
+      <span class="dot paused" id="status-dot"></span>
+      <span id="status-label">DEEP WORK READY</span>
+    </div>
+ 
+    <div class="ring-wrap">
+      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <circle class="ring-track" cx="50" cy="50" r="46" />
+        <circle id="ring-progress" cx="50" cy="50" r="46"
+                stroke-dasharray="289.03"
+                stroke-dashoffset="289.03" />
+      </svg>
+      <div class="ring-inner">
+        <div id="timer-display" class="idle">25:00</div>
+        <div id="timer-sub">FOCUS SESSION</div>
+      </div>
+    </div>
+ 
+    <div class="timer-controls">
+      <button class="btn btn-sm" id="btn-reset" title="Reset">↺</button>
+      <button class="btn btn-primary" id="btn-start" title="Start/Pause">▶</button>
+      <button class="btn btn-sm" id="btn-plus5" title="+5 min">+5</button>
+    </div>
+ 
+    <div class="duration-row">
+      <span class="dur-label">Session Duration</span>
+      <button class="dur-chip" data-mins="15">15m</button>
+      <button class="dur-chip active" data-mins="25">25m</button>
+      <button class="dur-chip" data-mins="45">45m</button>
+      <button class="dur-chip" data-mins="60">60m</button>
+      <div class="dur-custom">
+        <input type="number" id="custom-dur" min="1" max="240" placeholder="—" />
+        <span>min</span>
+      </div>
+    </div>
+ 
+    <div class="timer-progress-bar">
+      <div id="progress-fill"></div>
+    </div>
+  </div>
+ 
+  <!-- ── INFO ROW ───────────────────────────────────────────── -->
+  <div id="info-row">
+ 
+    <!-- Weather -->
+    <div class="card info-card" id="weather-card">
+      <div class="info-card-label">Environment</div>
+      <div id="weather-icon">🌤</div>
+      <div id="weather-temp" contenteditable="true" spellcheck="false">18°C</div>
+      <div id="weather-cond" contenteditable="true" spellcheck="false">Optimal Revision Climate</div>
+    </div>
+ 
+    <!-- Focus Mode -->
+    <div class="card" id="focus-card">
+      <div class="focus-mode-label">Focus Mode</div>
+      <div class="focus-mode-title" id="focus-mode-title">Deep Work</div>
+      <div class="focus-mode-sub" id="focus-mode-sub">No distractions. Pure focus.</div>
+      <div class="mode-chips">
+        <button class="mode-chip active" data-mode="deep">Deep Work</button>
+        <button class="mode-chip" data-mode="light">Light Study</button>
+        <button class="mode-chip" data-mode="exam">Exam Drill</button>
+        <button class="mode-chip" data-mode="review">Review</button>
+      </div>
+    </div>
+ 
+  </div>
+ 
+  <!-- ── VACATION COUNTDOWN ─────────────────────────────────── -->
+  <div class="card" id="vacation-card">
+    <div class="vac-left">
+      <div class="vac-label">Countdown To Break</div>
+      <div id="vac-days"><span id="vac-num">—</span> days</div>
+      <div class="vac-sub" id="vac-sub">Set your target date →</div>
+    </div>
+    <div class="vac-right">
+      <div class="vac-date-label">Target Date</div>
+      <input type="date" id="vac-date-input" />
+    </div>
+  </div>
+ 
+</div><!-- /#app -->
+ 
+<!-- ─── CONFIG TOGGLE ────────────────────────────────────────── -->
+<button id="config-toggle" title="System Configuration">⚙</button>
+ 
+<!-- ─── CONFIG OVERLAY ───────────────────────────────────────── -->
+<div class="config-overlay" id="config-overlay"></div>
+ 
+<!-- ─── CONFIG PANEL ─────────────────────────────────────────── -->
+<div id="config-panel">
+  <button class="cfg-close" id="cfg-close">✕</button>
+ 
+  <div>
+    <div class="cfg-section-title">Accent Color</div>
+    <div class="color-swatches" id="color-swatches">
+      <div class="swatch active" style="background:#00e676" data-color="#00e676" data-color2="#29b6f6"></div>
+      <div class="swatch" style="background:#29b6f6" data-color="#29b6f6" data-color2="#00e676"></div>
+      <div class="swatch" style="background:#e040fb" data-color="#e040fb" data-color2="#f06292"></div>
+      <div class="swatch" style="background:#ffab40" data-color="#ffab40" data-color2="#ff6d00"></div>
+      <div class="swatch" style="background:#ff5252" data-color="#ff5252" data-color2="#ff8a80"></div>
+      <div class="swatch" style="background:#b2ff59" data-color="#b2ff59" data-color2="#76ff03"></div>
+    </div>
+  </div>
+ 
+  <hr class="cfg-divider"/>
+ 
+  <div>
+    <div class="cfg-section-title">Background Darkness</div>
+    <div class="cfg-row">
+      <label>Opacity</label>
+      <input type="range" id="dark-slider" min="0.5" max="1" step="0.05" value="1" />
+    </div>
+  </div>
+ 
+  <hr class="cfg-divider"/>
+ 
+  <div>
+    <div class="cfg-section-title">Timer</div>
+    <div class="cfg-row">
+      <label>Default Duration</label>
+      <select id="cfg-timer-select">
+        <option value="15">15 min</option>
+        <option value="25" selected>25 min</option>
+        <option value="45">45 min</option>
+        <option value="60">60 min</option>
+        <option value="90">90 min</option>
+      </select>
+    </div>
+  </div>
+ 
+  <hr class="cfg-divider"/>
+ 
+  <div>
+    <div class="cfg-section-title">Vacation Target</div>
+    <div class="cfg-row">
+      <label>Break Date</label>
+      <input type="date" id="cfg-vac-date" style="background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:0.72rem;padding:5px 8px;outline:none;color-scheme:dark;" />
+    </div>
+  </div>
+ 
+  <hr class="cfg-divider"/>
+ 
+  <div>
+    <div class="cfg-section-title">Session Stats</div>
+    <div class="stats-grid">
+      <div class="stat-cell">
+        <div class="stat-val" id="stat-today">0</div>
+        <div class="stat-lbl">Today's Sessions</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-val" id="stat-total">0</div>
+        <div class="stat-lbl">Total Sessions</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-val" id="stat-streak">0</div>
+        <div class="stat-lbl">Day Streak</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-val" id="stat-hours">0h</div>
+        <div class="stat-lbl">Focus Hours</div>
+      </div>
+    </div>
+  </div>
+ 
+  <hr class="cfg-divider"/>
+  <div style="font-size:0.6rem;color:var(--muted);letter-spacing:0.12em;text-align:center;">EXAM FOCUS STATION · v2.0</div>
+</div>
+ 
+<!-- ─── TOAST ─────────────────────────────────────────────────── -->
+<div id="toast"></div>
+ 
+<script>
+/* ════════════════════════════════════════════════════════════
+   STATE & PERSISTENCE
+════════════════════════════════════════════════════════════ */
+const STATE_KEY = 'efs_state_v3';
+ 
+const defaultState = {
+  accentColor:  '#00e676',
+  accentColor2: '#29b6f6',
+  darkMulti:    1,
+  timerDur:     25,
+  vacDate:      '',
+  weatherTemp:  '18°C',
+  weatherCond:  'Optimal Revision Climate',
+  focusMode:    'deep',
+  todaySessions:0,
+  totalSessions:0,
+  streak:       0,
+  totalMins:    0,
+  lastDate:     '',
+};
+ 
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STATE_KEY);
+    return raw ? { ...defaultState, ...JSON.parse(raw) } : { ...defaultState };
+  } catch { return { ...defaultState }; }
+}
+ 
+function saveState() {
+  try { localStorage.setItem(STATE_KEY, JSON.stringify(S)); } catch {}
+}
+ 
+let S = loadState();
+ 
+/* ════════════════════════════════════════════════════════════
+   TIMER ENGINE
+════════════════════════════════════════════════════════════ */
+let timerTotal   = S.timerDur * 60;
+let timerLeft    = timerTotal;
+let timerRunning = false;
+let timerInterval = null;
+let doneAlert    = false;
+ 
+const elDisplay = document.getElementById('timer-display');
+const elSub     = document.getElementById('timer-sub');
+const elDot     = document.getElementById('status-dot');
+const elLabel   = document.getElementById('status-label');
+const elBtnStart= document.getElementById('btn-start');
+const elBtnReset= document.getElementById('btn-reset');
+const elBtnPlus = document.getElementById('btn-plus5');
+const elProgress= document.getElementById('progress-fill');
+const elRing    = document.getElementById('ring-progress');
+const elTimerCard = document.getElementById('timer-card');
+ 
+const RING_CIRC = 2 * Math.PI * 46; // ≈ 289.03
+ 
+function fmtTime(secs) {
+  const m = Math.floor(secs / 60).toString().padStart(2, '0');
+  const s = (secs % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
+ 
+function updateRing(fraction) {
+  const offset = RING_CIRC * (1 - fraction);
+  elRing.style.strokeDashoffset = offset;
+}
+ 
+function renderTimer() {
+  elDisplay.textContent = fmtTime(timerLeft);
+  const frac = timerTotal > 0 ? (timerTotal - timerLeft) / timerTotal : 0;
+  updateRing(1 - frac);
+  elProgress.style.width = (frac * 100) + '%';
+}
+ 
+function setTimerState(state) {
+  elDisplay.className = state;
+  if (state === 'running') {
+    elDot.classList.remove('paused');
+    elLabel.textContent = 'SESSION ACTIVE';
+    elBtnStart.textContent = '⏸';
+    elTimerCard.classList.add('running');
+  } else if (state === 'paused') {
+    elDot.classList.add('paused');
+    elLabel.textContent = 'PAUSED';
+    elBtnStart.textContent = '▶';
+    elTimerCard.classList.remove('running');
+  } else if (state === 'done') {
+    elDot.classList.add('paused');
+    elLabel.textContent = 'SESSION COMPLETE ✓';
+    elBtnStart.textContent = '↺';
+    elTimerCard.classList.remove('running');
+  } else {
+    elDot.classList.add('paused');
+    elLabel.textContent = 'DEEP WORK READY';
+    elBtnStart.textContent = '▶';
+    elTimerCard.classList.remove('running');
+  }
+}
+ 
+function startTimer() {
+  if (timerLeft <= 0) { resetTimer(); return; }
+  timerRunning = true;
+  doneAlert = false;
+  setTimerState('running');
+  timerInterval = setInterval(() => {
+    if (timerLeft > 0) {
+      timerLeft--;
+      renderTimer();
+    } else {
+      clearInterval(timerInterval);
+      timerRunning = false;
+      completeSession();
+    }
+  }, 1000);
+}
+ 
+function pauseTimer() {
+  clearInterval(timerInterval);
+  timerRunning = false;
+  setTimerState('paused');
+}
+ 
+function resetTimer() {
+  clearInterval(timerInterval);
+  timerRunning = false;
+  timerLeft = timerTotal;
+  renderTimer();
+  setTimerState('idle');
+}
+ 
+function completeSession() {
+  setTimerState('done');
+  const today = new Date().toDateString();
+  if (S.lastDate !== today) {
+    if (isYesterday(S.lastDate)) S.streak++;
+    else if (S.lastDate !== today) S.streak = 1;
+    S.todaySessions = 0;
+    S.lastDate = today;
+  }
+  S.todaySessions++;
+  S.totalSessions++;
+  S.totalMins += S.timerDur;
+  saveState();
+  updateStats();
+  updateSessionBadge();
+  showToast('✓ Session complete — excellent work!');
+  if ('vibrate' in navigator) navigator.vibrate([200, 100, 200]);
+}
+ 
+function isYesterday(dateStr) {
+  if (!dateStr) return false;
+  const y = new Date(); y.setDate(y.getDate() - 1);
+  return y.toDateString() === dateStr;
+}
+ 
+elBtnStart.addEventListener('click', () => {
+  if (timerRunning) pauseTimer();
+  else if (timerLeft <= 0) { resetTimer(); setTimeout(startTimer, 50); }
+  else startTimer();
+});
+ 
+elBtnReset.addEventListener('click', resetTimer);
+ 
+elBtnPlus.addEventListener('click', () => {
+  timerLeft = Math.min(timerLeft + 300, 7200);
+  timerTotal = Math.max(timerTotal, timerLeft);
+  renderTimer();
+  showToast('+5 minutes added');
+});
+ 
+/* duration chips */
+document.querySelectorAll('.dur-chip').forEach(c => {
+  c.addEventListener('click', () => {
+    const m = parseInt(c.dataset.mins);
+    setDuration(m);
+    document.querySelectorAll('.dur-chip').forEach(x => x.classList.remove('active'));
+    c.classList.add('active');
+    document.getElementById('custom-dur').value = '';
+  });
+});
+ 
+document.getElementById('custom-dur').addEventListener('change', e => {
+  const m = parseInt(e.target.value);
+  if (m >= 1 && m <= 240) {
+    setDuration(m);
+    document.querySelectorAll('.dur-chip').forEach(x => x.classList.remove('active'));
+  }
+});
+ 
+function setDuration(mins) {
+  if (timerRunning) pauseTimer();
+  S.timerDur = mins;
+  timerTotal = mins * 60;
+  timerLeft  = timerTotal;
+  renderTimer();
+  setTimerState('idle');
+  saveState();
+}
+ 
+/* ════════════════════════════════════════════════════════════
+   LIVE CLOCK
+════════════════════════════════════════════════════════════ */
+const DAYS  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MONTHS= ['January','February','March','April','May','June','July','August','September','October','November','December'];
+ 
+function updateClock() {
+  const now = new Date();
+  const h = now.getHours().toString().padStart(2,'0');
+  const m = now.getMinutes().toString().padStart(2,'0');
+  const s = now.getSeconds().toString().padStart(2,'0');
+  document.getElementById('live-time').textContent = `${h}:${m}:${s}`;
+  const day  = DAYS[now.getDay()];
+  const date = now.getDate().toString().padStart(2,'0');
+  const mon  = MONTHS[now.getMonth()];
+  const yr   = now.getFullYear();
+  document.getElementById('live-date').textContent = `${day} · ${date} ${mon} ${yr}`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+ 
+/* ════════════════════════════════════════════════════════════
+   VACATION COUNTDOWN
+════════════════════════════════════════════════════════════ */
+function updateVacation(dateStr) {
+  if (!dateStr) {
+    document.getElementById('vac-num').textContent = '—';
+    document.getElementById('vac-sub').textContent = 'Set your target date →';
+    return;
+  }
+  const target = new Date(dateStr);
+  const now    = new Date(); now.setHours(0,0,0,0);
+  const diff   = Math.ceil((target - now) / 86400000);
+  const el = document.getElementById('vac-num');
+  if (diff > 0) {
+    el.textContent = diff;
+    document.getElementById('vac-sub').textContent = `until ${target.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}`;
+  } else if (diff === 0) {
+    el.textContent = '🎉';
+    document.getElementById('vac-sub').textContent = "Today is the day!";
+  } else {
+    el.textContent = Math.abs(diff);
+    document.getElementById('vac-sub').textContent = `days since your break started`;
+  }
+}
+ 
+document.getElementById('vac-date-input').addEventListener('change', e => {
+  S.vacDate = e.target.value;
+  document.getElementById('cfg-vac-date').value = S.vacDate;
+  updateVacation(S.vacDate);
+  saveState();
+});
+ 
+document.getElementById('cfg-vac-date').addEventListener('change', e => {
+  S.vacDate = e.target.value;
+  document.getElementById('vac-date-input').value = S.vacDate;
+  updateVacation(S.vacDate);
+  saveState();
+});
+ 
+/* ════════════════════════════════════════════════════════════
+   WEATHER (editable)
+════════════════════════════════════════════════════════════ */
+const elTemp = document.getElementById('weather-temp');
+const elCond = document.getElementById('weather-cond');
+ 
+elTemp.addEventListener('blur', () => { S.weatherTemp = elTemp.textContent; saveState(); });
+elCond.addEventListener('blur', () => { S.weatherCond = elCond.textContent; saveState(); });
+ 
+/* ════════════════════════════════════════════════════════════
+   FOCUS MODE
+════════════════════════════════════════════════════════════ */
+const MODES = {
+  deep:   { title: 'Deep Work',    sub: 'No distractions. Pure focus.' },
+  light:  { title: 'Light Study',  sub: 'Gentle concentration mode.' },
+  exam:   { title: 'Exam Drill',   sub: 'Timed practice. Maximum recall.' },
+  review: { title: 'Review Pass',  sub: 'Consolidate & reinforce.' },
+};
+ 
+function setFocusMode(mode) {
+  S.focusMode = mode;
+  document.getElementById('focus-mode-title').textContent = MODES[mode].title;
+  document.getElementById('focus-mode-sub').textContent   = MODES[mode].sub;
+  document.querySelectorAll('.mode-chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.mode === mode);
+  });
+  saveState();
+}
+ 
+document.querySelectorAll('.mode-chip').forEach(c => {
+  c.addEventListener('click', () => setFocusMode(c.dataset.mode));
+});
+ 
+/* ════════════════════════════════════════════════════════════
+   CONFIG PANEL
+════════════════════════════════════════════════════════════ */
+const cfgPanel   = document.getElementById('config-panel');
+const cfgOverlay = document.getElementById('config-overlay');
+ 
+document.getElementById('config-toggle').addEventListener('click', openConfig);
+document.getElementById('cfg-close').addEventListener('click', closeConfig);
+cfgOverlay.addEventListener('click', closeConfig);
+ 
+function openConfig()  { cfgPanel.classList.add('open'); cfgOverlay.classList.add('open'); }
+function closeConfig() { cfgPanel.classList.remove('open'); cfgOverlay.classList.remove('open'); }
+ 
+/* accent colors */
+document.querySelectorAll('.swatch').forEach(sw => {
+  sw.addEventListener('click', () => {
+    document.querySelectorAll('.swatch').forEach(x => x.classList.remove('active'));
+    sw.classList.add('active');
+    S.accentColor  = sw.dataset.color;
+    S.accentColor2 = sw.dataset.color2;
+    applyAccent();
+    saveState();
+  });
+});
+ 
+function applyAccent() {
+  document.documentElement.style.setProperty('--accent',  S.accentColor);
+  document.documentElement.style.setProperty('--accent2', S.accentColor2);
+}
+ 
+/* darkness slider */
+document.getElementById('dark-slider').addEventListener('input', e => {
+  S.darkMulti = parseFloat(e.target.value);
+  document.documentElement.style.setProperty('--dark-multi', S.darkMulti);
+  saveState();
+});
+ 
+/* config timer select */
+document.getElementById('cfg-timer-select').addEventListener('change', e => {
+  const m = parseInt(e.target.value);
+  setDuration(m);
+  // sync chips
+  document.querySelectorAll('.dur-chip').forEach(c => {
+    c.classList.toggle('active', parseInt(c.dataset.mins) === m);
+  });
+});
+ 
+/* ════════════════════════════════════════════════════════════
+   STATS
+════════════════════════════════════════════════════════════ */
+function updateStats() {
+  document.getElementById('stat-today').textContent  = S.todaySessions;
+  document.getElementById('stat-total').textContent  = S.totalSessions;
+  document.getElementById('stat-streak').textContent = S.streak;
+  const h = (S.totalMins / 60).toFixed(1);
+  document.getElementById('stat-hours').textContent  = h + 'h';
+}
+ 
+function updateSessionBadge() {
+  const badge = document.getElementById('session-count-badge');
+  const n = S.todaySessions;
+  badge.textContent = n === 0 ? '0 sessions today' : n === 1 ? '1 session today' : `${n} sessions today`;
+}
+ 
+/* ════════════════════════════════════════════════════════════
+   TOAST
+════════════════════════════════════════════════════════════ */
+let toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+ 
+/* ════════════════════════════════════════════════════════════
+   INIT — restore saved state
+════════════════════════════════════════════════════════════ */
+function init() {
+  // check & reset daily sessions
+  const today = new Date().toDateString();
+  if (S.lastDate && S.lastDate !== today && !isYesterday(S.lastDate)) {
+    S.streak = 0;
+  }
+  if (S.lastDate !== today) S.todaySessions = 0;
+ 
+  applyAccent();
+  document.documentElement.style.setProperty('--dark-multi', S.darkMulti);
+ 
+  // duration
+  timerTotal = S.timerDur * 60;
+  timerLeft  = timerTotal;
+  renderTimer();
+  setTimerState('idle');
+ 
+  // chips
+  document.querySelectorAll('.dur-chip').forEach(c => {
+    c.classList.toggle('active', parseInt(c.dataset.mins) === S.timerDur);
+  });
+  document.getElementById('cfg-timer-select').value = S.timerDur;
+ 
+  // weather
+  elTemp.textContent = S.weatherTemp;
+  elCond.textContent = S.weatherCond;
+ 
+  // vacation
+  if (S.vacDate) {
+    document.getElementById('vac-date-input').value = S.vacDate;
+    document.getElementById('cfg-vac-date').value   = S.vacDate;
+    updateVacation(S.vacDate);
+  }
+ 
+  // focus mode
+  setFocusMode(S.focusMode || 'deep');
+ 
+  // accent swatch highlight
+  document.querySelectorAll('.swatch').forEach(sw => {
+    sw.classList.toggle('active', sw.dataset.color === S.accentColor);
+  });
+ 
+  // darkness slider
+  document.getElementById('dark-slider').value = S.darkMulti;
+ 
+  updateStats();
+  updateSessionBadge();
+  saveState();
+}
+ 
+init();
+ 
+/* ════════════════════════════════════════════════════════════
+   PREVENT DOUBLE-TAP ZOOM on controls
+════════════════════════════════════════════════════════════ */
+document.querySelectorAll('.btn, .dur-chip, .mode-chip, .swatch').forEach(el => {
+  el.addEventListener('touchend', e => e.preventDefault(), { passive: false });
+});
+</script>
+</body>
+</html>
